@@ -16,7 +16,6 @@ const server = net.createServer();
 
 server.on('connection', (socket) => {
   const user = new User(socket);
-  socket.setEncoding('utf8'); // set socket to text data
   socket.write(`Welcome to the chatroom, ${user.nickname}!\n`);
   // keep a record of that user in our socketPool by making a  new 
   // key value pair that looks like this:
@@ -29,7 +28,7 @@ server.on('connection', (socket) => {
   logger.log(logger.INFO, `A new user ${user.nickname} has entered the chatroom!`);
 
   socket.on('data', (buffer) => {
-    chat.dispatchAction(user, buffer);
+    chat.dispatchAction(user, buffer.toString());
   });
 });
 

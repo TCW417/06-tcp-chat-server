@@ -17,22 +17,25 @@ const event = new EventEmitter();
 // const socketPool = {};
 
 const parseData = (buffer) => {
+  console.log('input buffer', buffer);
   let text = buffer.trim();
   if (!text.startsWith('@')) return null;
   text = text.split(' '); // string to array
-  const [command, ...message] = text; // decomp to first word and everything else
-  message.join(' '); // return array to string
+  console.log(text);
+  const [command, ...msg] = text; // decomp to first word and everything else
+  const message = msg.join(' '); // return array to string
+  console.log(message);
   return {
     command,
     message,
   };
 };
 
-chat.dispatchAction = (user, buffer) => {
-  const entry = parseData(buffer);
+chat.dispatchAction = (user, stringBuffer) => {
+  const entry = parseData(stringBuffer);
   if (!entry) {
     logger.log(logger.INFO, `null, or non-@-prefixed data recieved from user ${user._id}`);
-    user.socket.write(`Usage: @cmd message\n\nWhere: @cmd is @all, @dm, @list, @myname or @quit\nmessage is chat message or new nickename (with @myname)\n`); /* eslint-disable-line */
+    event.emit('@help', null, user);
     return null;
   }
   // @command message received. No guarantee that @command is recognized.
@@ -63,6 +66,50 @@ event.on('@list', (ignored, user) => {
   Object.keys(socketPool).forEach((userIdKey) => {
     user.socket.write(`${socketPool[userIdKey].nickname}\n`);
   });
+});
+
+event.on('@dm', (message, user) => {
+  logger.log(logger.INFO, `@dm rec'd: |${message}|`);
+  const getDmUserSocket = (username) => {
+    const dmSocket = Object.keys(socketPool)
+      .map((poolItem) => {
+        return { 
+          nickname: socketPool[poolItem].nickname,
+          socket: socketPool[poolItem].socket,
+        };
+      })
+      .filter(users => users.nickname === username);
+    return dmSocket.length > 0 ? dmSocket[0].socket : null;
+  };
+
+  const chunks = message.split(' ');
+  const [dmUser, ...chatMessage] = chunks;
+  const chatMsg = chatMessage.join(' ');
+  const dmSocket = getDmUserSocket(dmUser);
+  console.log(dmSocket);
+  if (dmSocket) dmSocket.write(`${user.nickname}@dm>> ${chatMsg}\n`);
+});
+
+event.on('@help', (cmd, user) => {
+  logger.log(logger.INFO, `@help rec'd: |${cmd}| typeof ${typeof cmd}`);
+  if (cmd === null) {
+    user.socket.write(`Usage: @cmd message\n\nWhere: @cmd is @all, @dm, @list, @myname, @help or @quit\nmessage is chat message, new nickename (with @myname) or @cmd (with @help)\n`); /* eslint-disable-line */
+    return;
+  }
+  // switch (cmd) {
+  //   case '@all':
+  if (cmd === '@all') {
+    user.socket.write('@all <message> broadcasts <message> to all chat users.\n');
+  }
+  // break;
+  // case '@dm':
+  if (cmd === '@dm') {
+    user.socket.write('@dm <user> <message> sends <message> directly to <user>. user @list to get list of users.\n');
+  }
+  //   break;
+  // default:
+  //     user.socket.write(`Unrecognized help request: ${cmd}\n`)
+  // }
 });
 
 event.on('@quit', (ignored, user) => {
